@@ -71,7 +71,6 @@ class Server(Base):
         print(response)
         if not response == b'Recived':
             print("[!] Failed to share AES key")
-            exit()
         #except Exception,e:
         #    print(e)
     def sendEncrypted(self, msg):
@@ -89,9 +88,31 @@ class Server(Base):
             print('[!] You must share an AES key before attempting encrypted transmission')
         else:
             crypto = self.con_soc.recv(4072)
-            msg = self.removePadding(self.AESKey.decrypt(crypto).decode())
-            print("[*] Recived %s" % (str(crypto)))
-            return msg
+            if not crypto == b'End':
+                msg = self.removePadding(self.AESKey.decrypt(crypto).decode())
+                print("[*] Recived %s" % (str(crypto)))
+                return msg
+            else:
+                self.terminate()
+    def terminate():
+        print("[*] Peer sent end request. Terminating connection and reseting keys")
+        self.con_soc.close()
+        self.seedRSA = Random.new().read
+        self.RSAKey = False
+        self.AESKey = False
+        self.AESiv = False
+        self.ptAESKey = False
+        self.clientRSAKey = False
+
+    def dissconect(self):
+        print("[*] Sending end request. Terminating connection and reseting keys")
+        self.con_soc.send(b'End')
+        self.seedRSA = Random.new().read
+        self.RSAKey = False
+        self.AESKey = False
+        self.AESiv = False
+        self.ptAESKey = False
+        self.clientRSAKey = False
 
 class Client(Base):
     """Client class contains methods for establish a connection from
@@ -114,13 +135,11 @@ class Client(Base):
             self.soc.send(self.RSAKey.publickey().exportKey())
         except:
             print("[!] Failed to exchange keys")
-            exit()
 
     def shareAESKeys(self):
         #try:
-        ptAESKey, AESiv = self.RSAKey.decrypt(self.soc.recv(4072)).decode().split(':')
-        print(ptAESKey, AESiv)
-        self.AESKey = AES.new(ptAESKey, AES.MODE_CFB, AESiv)
+        ptAESKey, self.AESiv = self.RSAKey.decrypt(self.soc.recv(4072)).decode().split(':')
+        self.AESKey = AES.new(ptAESKey, AES.MODE_CFB, self.AESiv)
         self.soc.send(b'Recived')
         #except Exception e:
         #    print(e)
@@ -140,6 +159,27 @@ class Client(Base):
             print('[!] You must share an AES key before attempting encrypted transmission')
         else:
             crypto = self.soc.recv(4072)
-            msg = self.removePadding(self.AESKey.decrypt(crypto).decode())
-            print("[*] Recived %s" % (str(crypto)))
-            return msg
+            if not crypto == b'End':
+                msg = self.removePadding(self.AESKey.decrypt(crypto).decode())
+                print("[*] Recived %s" % (str(crypto)))
+                return msg
+            else:
+                self.terminate()
+
+    def terminate():
+        print("[*] Peer sent end request. Terminating connection and reseting keys")
+        self.soc.close()
+        self.seedRSA = Random.new().read
+        self.RSAKey = False
+        self.AESKey = False
+        self.AESiv = False
+        self.serverRSAKey = False
+
+    def dissconect(self):
+        print("[*] Sending end request. Terminating connection and reseting keys")
+        self.soc.send(b'End')
+        self.seedRSA = Random.new().read
+        self.RSAKey = False
+        self.AESKey = False
+        self.AESiv = False
+        self.serverRSAKey = False
